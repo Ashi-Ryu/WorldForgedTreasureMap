@@ -1,0 +1,9 @@
+## Interface: 30300
+## Title: TreasureMap
+## Author: Ashi-Ryu
+## Notes: WorldForgedMap from https://bronzebeardmaps.pages.dev
+## Version: 1.6-final-fix-v12
+## SavedVariablesPerCharacter: WorldForgedMapDB
+
+WorldForgedMap_Data.lua
+WorldForgedMap.lua
