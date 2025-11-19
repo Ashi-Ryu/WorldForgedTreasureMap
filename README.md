@@ -3,6 +3,7 @@ https://bronzebeardmaps.pages.dev recreated as a map overlay treasure map
 **KNOWN ISSUES** Minimap pins "orbit" the center point as you approach, creating a radar effect
 /wfmap for commands:
  ``` /wfmap toggle collected
+  /wfmap toggle collected
   /wfmap list
   /wfmap reset
   /wfmap inverty
