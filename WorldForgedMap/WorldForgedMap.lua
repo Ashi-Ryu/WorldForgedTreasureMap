@@ -308,8 +308,8 @@ local function AcquireMinimapPin(entry)
     else
         pin = CreateFrame("Button", nil, Minimap)
         pin:SetSize(16, 16)
-        pin:SetFrameStrata("HIGH")
-        pin:SetFrameLevel(10)
+        pin:SetFrameStrata("LOW")
+        pin:SetFrameLevel(1)
 
         pin.texture = pin:CreateTexture(nil, "OVERLAY")
         pin.texture:SetAllPoints()
