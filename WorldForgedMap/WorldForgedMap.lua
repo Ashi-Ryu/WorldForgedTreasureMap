@@ -1,9 +1,9 @@
 -- WorldForgedMap.lua (Ascension 3.3.5, UI 30300)
 -- Logic for WorldForgedMap
--- Version: 2.0
+-- Version: 2.1
 
 local ADDON_NAME = "WorldForgedMap"
-local ADDON_VERSION = "2.0"
+local ADDON_VERSION = "2.1"
 
 -- Load data from external file (WorldForgedMap_Data.lua)
 if not WorldForgedMap_Data then
@@ -19,6 +19,7 @@ WorldForgedMapDB.showCollected = WorldForgedMapDB.showCollected or false
 WorldForgedMapDB.invertY = WorldForgedMapDB.invertY or false
 WorldForgedMapDB.opacity = WorldForgedMapDB.opacity or 100 -- 0..100
 WorldForgedMapDB.showMinimapPins = WorldForgedMapDB.showMinimapPins ~= nil and WorldForgedMapDB.showMinimapPins or true
+WorldForgedMapDB.maxMinimapPins = WorldForgedMapDB.maxMinimapPins or 5 -- default 5
 
 -- Utility
 local function GetCurrentMapArea()
@@ -365,7 +366,7 @@ local function AcquireMinimapPin(entry)
     return pin
 end
 
--- OPTIMIZED: Movement throttling added
+-- OPTIMIZED: Movement throttling + nearest N pins only
 UpdateMinimapPins = function()
     if not WorldForgedMapDB.showMinimapPins then
         for _, pin in pairs(activeMinimapPins) do if pin then pin:Hide() end end
@@ -394,43 +395,56 @@ UpdateMinimapPins = function()
     local points = data[currentMapID]
     if not points then return end
 
-    local newActivePins = {}
-    local baseAlpha = (WorldForgedMapDB.opacity or 100) / 100
-
+    -- OPTIMIZATION: Calculate distances and sort to get nearest N
+    local distanceTable = {}
+    
     for _, entry in ipairs(points) do
         if entry and entry.x and entry.y then
             if not (IsCollected(entry.id) and not WorldForgedMapDB.showCollected) then
-                local pin = activeMinimapPins[entry.id]
-                if not pin then
-                    pin = AcquireMinimapPin(entry)
-                else
-                    pin.wf_name = (entry.name and entry.name ~= "") and entry.name or ("WorldForged Pin")
-                    pin.wf_coords = entry.wf_coords or { x = entry.x, y = entry.y }
-                end
-                
-                local collected = IsCollected(entry.id)
-                local mul = collected and 0.6 or 1
-                pin.texture:SetVertexColor(collected and 0.6 or 1, collected and 0.6 or 1, collected and 0.6 or 1)
-                pin.texture:SetAlpha(baseAlpha * mul)
-
                 local dist, xDist, yDist = ComputeDistance(C, Z, x, y, C, Z, entry.x, entry.y)
                 
                 if dist and dist < 1000 then
-                    placeIconOnMinimap(pin, dist, xDist, yDist)
-                    newActivePins[entry.id] = pin
-                else
-                    if pin and not pin._pooled then
-                        pin:Hide()
-                        pin._pooled = true
-                        table.insert(minimapPinPool, pin)
-                    else
-                        if pin then pin:Hide() end
-                    end
+                    table.insert(distanceTable, {
+                        entry = entry,
+                        dist = dist,
+                        xDist = xDist,
+                        yDist = yDist
+                    })
                 end
             end
         end
     end
     
+    -- Sort by distance (closest first)
+    table.sort(distanceTable, function(a, b) return a.dist < b.dist end)
+    
+    -- Only show the nearest N pins (configurable)
+    local maxPins = WorldForgedMapDB.maxMinimapPins or 5
+    local newActivePins = {}
+    local baseAlpha = (WorldForgedMapDB.opacity or 100) / 100
+    
+    for i = 1, math.min(maxPins, #distanceTable) do
+        local data = distanceTable[i]
+        local entry = data.entry
+        
+        local pin = activeMinimapPins[entry.id]
+        if not pin then
+            pin = AcquireMinimapPin(entry)
+        else
+            pin.wf_name = (entry.name and entry.name ~= "") and entry.name or ("WorldForged Pin")
+            pin.wf_coords = entry.wf_coords or { x = entry.x, y = entry.y }
+        end
+        
+        local collected = IsCollected(entry.id)
+        local mul = collected and 0.6 or 1
+        pin.texture:SetVertexColor(collected and 0.6 or 1, collected and 0.6 or 1, collected and 0.6 or 1)
+        pin.texture:SetAlpha(baseAlpha * mul)
+
+        placeIconOnMinimap(pin, data.dist, data.xDist, data.yDist)
+        newActivePins[entry.id] = pin
+    end
+    
+    -- Hide all pins that aren't in the nearest N
     for id, pin in pairs(activeMinimapPins) do
         if not newActivePins[id] then
             if pin and not pin._pooled then
@@ -525,7 +539,7 @@ local function PrintCurrentMapDebug()
     print("  Tip: use the numeric MapAreaID (above) as the key in your data table (e.g., [44] = {...})")
 end
 
--- Slash commands 
+-- Slash commands (single /wfmap with mapid debug)
 SLASH_WORLDFORGED1 = "/wfmap"
 SlashCmdList["WORLDFORGED"] = function(msg)
     msg = msg and msg:lower() or ""
@@ -535,7 +549,7 @@ SlashCmdList["WORLDFORGED"] = function(msg)
         if UpdateMinimapPins then pcall(UpdateMinimapPins) end
         return
     end
-    if msg == "toggle collected" then
+    if msg == "toggle" then
         WorldForgedMapDB.showCollected = not WorldForgedMapDB.showCollected
         print(ADDON_NAME .. ": showCollected = " .. tostring(WorldForgedMapDB.showCollected))
         OnWorldMapEvent(WorldForgedMapFrame, "WORLD_MAP_UPDATE")
@@ -562,9 +576,18 @@ SlashCmdList["WORLDFORGED"] = function(msg)
             print(ADDON_NAME .. ": default pin opacity set to " .. pct .. "%")
             OnWorldMapEvent(WorldForgedMapFrame, "WORLD_MAP_UPDATE")
         end
+    elseif msg:match("^maxpins%s+%d+") then
+        local num = tonumber(msg:match("^maxpins%s+(%d+)"))
+        if num and num >= 1 and num <= 50 then
+            WorldForgedMapDB.maxMinimapPins = num
+            print(ADDON_NAME .. ": max minimap pins set to " .. num)
+            if UpdateMinimapPins then pcall(UpdateMinimapPins) end
+        else
+            print(ADDON_NAME .. ": maxpins must be between 1 and 50")
+        end
     else
         print("|cff33ff99WorldForgedMap|r commands:")
-        print("  /wfmap toggle collected")
+        print("  /wfmap toggle")
         print("  /wfmap list")
         print("  /wfmap reset")
         print("  /wfmap inverty")
@@ -572,6 +595,7 @@ SlashCmdList["WORLDFORGED"] = function(msg)
         print("  /wfmap force <id>")
         print("  /wfmap opacity <0-100>")
         print("  /wfmap minimap  ← toggle minimap pins")
+        print("  |cff00ff00/wfmap maxpins <1-50>|r  ← set max minimap pins (default: 5)")
     end
 end
 
