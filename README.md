@@ -9,4 +9,5 @@ https://bronzebeardmaps.pages.dev recreated as a map overlay treasure map
   /wfmap mapid  ← show current map ID
   /wfmap force <id>
   /wfmap opacity <0-100>
-  /wfmap minimap  ← toggle minimap pins ```
+  /wfmap minimap  ← toggle minimap pins
+  /wfmap maxpins <1-50>|r  ← set max minimap pins (default: 5)
