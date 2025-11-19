@@ -549,7 +549,7 @@ SlashCmdList["WORLDFORGED"] = function(msg)
         if UpdateMinimapPins then pcall(UpdateMinimapPins) end
         return
     end
-    if msg == "toggle" then
+    if msg == "toggle collected" then
         WorldForgedMapDB.showCollected = not WorldForgedMapDB.showCollected
         print(ADDON_NAME .. ": showCollected = " .. tostring(WorldForgedMapDB.showCollected))
         OnWorldMapEvent(WorldForgedMapFrame, "WORLD_MAP_UPDATE")
@@ -587,7 +587,7 @@ SlashCmdList["WORLDFORGED"] = function(msg)
         end
     else
         print("|cff33ff99WorldForgedMap|r commands:")
-        print("  /wfmap toggle")
+        print("  /wfmap toggle collected")
         print("  /wfmap list")
         print("  /wfmap reset")
         print("  /wfmap inverty")
